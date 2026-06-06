@@ -21,6 +21,7 @@
 #define Uses_opstream
 #define Uses_ipstream
 #include <tvision/tv.h>
+#include <tvision/colors.h> // reverseAttribute() for proportional thumb edges
 
 #if !defined( __CTYPE_H )
 #include <ctype.h>
@@ -62,21 +63,105 @@ void TScrollBar::draw()
     drawPos(getPos());
 }
 
-void TScrollBar::drawPos( int pos ) noexcept
+// Modern, proportional scroll bar.
+//
+// The thumb's *length* reflects the visible fraction of the content
+// (pgStep / (range + pgStep)), and both its length and position are drawn to
+// 1/8-cell precision using the Unicode block-element glyphs, over a light-shade
+// trough. The 'pos' argument is ignored: the thumb is recomputed from 'value',
+// which keeps live drag feedback correct (handleEvent's drawPos() call runs
+// after setValue() has updated 'value').
+//
+// Glyphs (UTF-8 'E2 96 xx'): vertical fills from the bottom with the lower
+// blocks (0x81..0x88 == one..eight eighths), horizontal fills from the left
+// with the left blocks (0x8F..0x88). A solid block only fills from one fixed
+// end of the cell, so the *opposite* thumb edge is drawn with the complementary
+// block in the reversed attribute, letting its background read as the thumb
+// colour. Because the thumb is at least one cell tall a single cell never has a
+// trough gap on both ends, so the four cases below are exhaustive.
+void TScrollBar::drawPos( int ) noexcept
 {
     TDrawBuffer b;
 
-    int s = getSize() - 1;
-    b.moveChar( 0, chars[0], getColor(2), 1 );
-    if( maxVal == minVal )
-        b.moveChar( 1, chars[4], getColor(1), s-1 );
+    Boolean vert = Boolean( size.x == 1 );
+    int total = getSize();      // length incl. the two arrow cells
+    int last = total - 1;       // index of the far arrow
+    int track = total - 2;      // cells available for thumb + trough
+    if( track < 1 )
+        track = 1;
+
+    TColorAttr cThumb = getColor(1);                // {wcBarThumb fg, wcBarTrough bg}
+    TColorAttr cThumbR = reverseAttribute(cThumb);  // edge complement (bg reads as thumb)
+    TColorAttr cArrow = getColor(2);
+
+    // Thumb extent along the track, measured in eighths of a cell.
+    int E = track * 8;
+    int range = maxVal - minVal;
+    int thumbE, topE;
+    if( range <= 0 )
+        {
+        thumbE = E;             // nothing to scroll: thumb fills the whole track
+        topE = 0;
+        }
     else
         {
-        b.moveChar( 1, chars[2], getColor(1), s-1 );
-        b.moveChar( pos, chars[3], getColor(3), 1 );
+        long denom = (long) range + pgStep;
+        if( denom < 1 )
+            denom = 1;
+        thumbE = int( ((long) E * pgStep + denom/2) / denom );
+        int minE = min( 8, E ); // never smaller than one cell
+        if( thumbE < minE )
+            thumbE = minE;
+        if( thumbE > E )
+            thumbE = E;
+        int freeE = E - thumbE;
+        topE = int( ((long) freeE * (value - minVal) + range/2) / range );
+        if( topE < 0 )
+            topE = 0;
+        if( topE > freeE )
+            topE = freeE;
+        }
+    int botE = topE + thumbE;
+
+    b.moveChar( 0, chars[0], cArrow, 1 );
+    b.moveChar( last, chars[1], cArrow, 1 );
+
+    char glyph[4] = { '\xE2', '\x96', 0, 0 };
+    for( int j = 0; j < track; ++j )
+        {
+        int cellTop = j*8, cellBot = cellTop + 8;
+        int a = max( cellTop, topE );
+        int z = min( cellBot, botE );
+        int idx = 1 + j;
+        if( z <= a )                            // empty: light-shade trough
+            {
+            glyph[2] = '\x91';                  // U+2591
+            b.moveStr( idx, glyph, cThumb, 1 );
+            continue;
+            }
+        int topGap = a - cellTop;               // trough eighths on the top/left end
+        int botGap = cellBot - z;               // trough eighths on the bottom/right end
+        int k;
+        TColorAttr attr;
+        if( topGap == 0 && botGap == 0 )        // full thumb cell
+            {
+            k = 8;
+            attr = cThumb;
+            }
+        else if( vert ? (botGap == 0) : (topGap == 0) ) // gap on the far end: fill directly
+            {
+            k = 8 - (vert ? topGap : botGap);
+            attr = cThumb;
+            }
+        else                                    // gap on the near end: reversed complement
+            {
+            k = vert ? botGap : topGap;
+            attr = cThumbR;
+            }
+        glyph[2] = char( vert ? (0x80 + k) : (0x90 - k) );
+        b.moveStr( idx, glyph, attr, 1 );
         }
 
-    b.moveChar( s, chars[1], getColor(2), 1 );
     writeBuf( 0, 0, size.x, size.y, b );
 }
 
