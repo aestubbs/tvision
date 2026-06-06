@@ -76,6 +76,38 @@ void CpTranslator::setTranslation(const char (*aTranslation)[256][4]) noexcept
     }
 }
 
+void CpTranslator::setBoxDrawing(BoxDrawing style) noexcept
+{
+    if (style == BoxDrawing::Faithful)
+    {
+        setTranslation(nullptr); // restore the default (faithful CP437) table
+        return;
+    }
+    // Rounded: start from the faithful table and restyle just the box-drawing
+    // bytes -- every corner variant (single/double/mixed) to a rounded corner,
+    // and every double or mixed line, tee and cross to its single-line form.
+    char rounded[256][4];
+    memcpy(rounded, cp437toUtf8, sizeof(rounded));
+    static const struct { unsigned char b; const char *g; } remap[] = {
+        // corners -> rounded
+        {0xDA, "╭"}, {0xBF, "╮"}, {0xC0, "╰"}, {0xD9, "╯"},   // single
+        {0xC9, "╭"}, {0xBB, "╮"}, {0xC8, "╰"}, {0xBC, "╯"},   // double
+        {0xD5, "╭"}, {0xD6, "╭"}, {0xB7, "╮"}, {0xB8, "╮"},   // mixed
+        {0xD3, "╰"}, {0xD4, "╰"}, {0xBD, "╯"}, {0xBE, "╯"},
+        // double lines -> single
+        {0xCD, "─"}, {0xBA, "│"},
+        // tees / crosses (double or mixed) -> single
+        {0xCC, "├"}, {0xC6, "├"}, {0xC7, "├"},
+        {0xB9, "┤"}, {0xB5, "┤"}, {0xB6, "┤"},
+        {0xCB, "┬"}, {0xD1, "┬"}, {0xD2, "┬"},
+        {0xCA, "┴"}, {0xCF, "┴"}, {0xD0, "┴"},
+        {0xCE, "┼"}, {0xD7, "┼"}, {0xD8, "┼"},
+    };
+    for (auto &r : remap)
+        memcpy(rounded[r.b], r.g, sizeof(rounded[0]));
+    setTranslation(&rounded); // copies 'rounded' and rebuilds the reverse map
+}
+
 char CpTranslator::fromUtf8(TStringView s) noexcept
 {
     auto &map = utf8ToCp();

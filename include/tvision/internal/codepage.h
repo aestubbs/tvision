@@ -13,6 +13,14 @@ class CpTranslator
 
 public:
 
+    // Box-drawing style for the active code page. Faithful keeps the true CP437
+    // glyphs (single/double/mixed lines and corners). Rounded restyles them to a
+    // uniform modern look -- all corners rounded, all double/mixed lines, tees
+    // and crosses flattened to single -- which restyles window/menu frames and
+    // anything else drawn from CP437 box bytes. Faithful is the default.
+    enum class BoxDrawing { Faithful, Rounded };
+    static void setBoxDrawing(BoxDrawing style) noexcept;
+
     static void setTranslation(const char (*translation)[256][4]) noexcept;
 
     static const char (&toUtf8(unsigned char c) noexcept)[4]
