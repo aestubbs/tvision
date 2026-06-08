@@ -18,8 +18,32 @@ However, between July and August 2020 I found the way to integrate full-fledged 
 
 The original location of this project is https://github.com/magiblot/tvision.
 
+<div id="fork-additions"></div>
+
+## Additions in this fork
+
+This fork tracks upstream and layers a few optional, modern touches on top of it:
+
+* **Proportional scroll bars.** `TScrollBar` draws its thumb proportionally to the visible fraction of the content—like a modern GUI scroll bar—instead of the classic fixed one-cell indicator. Both the thumb length and position are rendered to 1/8-cell precision using Unicode block-element glyphs, degrading gracefully to full/half blocks under CP437.
+
+* **Optional rounded borders.** An opt-in box-drawing style restyles every window, menu and frame corner to a rounded corner (and flattens double/mixed lines, tees and crosses to their single-line form), giving the classic CP437 frames a softer, modern look. It is **off by default**, and toggling it is a single call:
+
+    ```c++
+    #include <tvision/internal/codepage.h>
+    using namespace tvision;
+
+    // Enable rounded borders (restyles every CP437 box-drawing glyph).
+    CpTranslator::setBoxDrawing(CpTranslator::BoxDrawing::Rounded);
+
+    // Restore the faithful CP437 glyphs.
+    CpTranslator::setBoxDrawing(CpTranslator::BoxDrawing::Faithful);
+    ```
+
+    The rounded glyphs require a UTF-8 capable terminal. The setting affects anything drawn from CP437 box bytes, so it also restyles tree connectors and similar decorations.
+
 # Table of contents
 
+* [Additions in this fork](#fork-additions)
 * [What is Turbo Vision good for?](#what-for)
 * [How do I use Turbo Vision?](#how-to)
 * [Releases and downloads](#downloads)
