@@ -84,6 +84,11 @@ void TButton::drawTitle( TDrawBuffer &b,
         if( l < 1 )
             l = 1;
         }
+    // The shortcut-letter palette entry is shared by the normal, default and
+    // selected states, so its background can only match one of them. Keep the
+    // entry's foreground but take the background from the state's own button
+    // attribute, so the letter never shows as a differently-coloured cell.
+    ::setBack( cButton[1], ::getBack( cButton[0] ) );
     b.moveCStr( i+l, title, cButton );
 
     if( showMarkers == True && !down )
